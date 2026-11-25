@@ -12,10 +12,12 @@ st.set_page_config(page_title="Project Rini v1.0", page_icon="🤖", layout="wid
 
 @st.cache_resource
 def bootstrap_local_embedding_engine():
+    # Cache local vector embedding extraction weights safely on CPU
     return SentenceTransformer("BAAI/bge-small-en-v1.5", device="cpu")
 
 @st.cache_resource
 def bootstrap_cloud_infrastructure(_endpoint, _api_key):
+    # Establish connection persistence to cloud vector cluster
     return QdrantClient(url=_endpoint, api_key=_api_key)
 
 # Bind security contexts cleanly out-of-band from the cached runtime secrets vault
@@ -37,18 +39,23 @@ st.title("🤖 Project Rini v1.0")
 st.caption("Decoupled Non-Parametric Cognitive Architecture — Growth Marketing Expert Core")
 st.markdown("---")
 
+# Session state initialization hooks
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 if "last_response" not in st.session_state:
     st.session_state.last_response = None
+if "last_query" not in st.session_state:
+    st.session_state.last_query = None
 if "retrieved_context" not in st.session_state:
     st.session_state.retrieved_context = ""
 
-left_col, right_col = st.columns()
+# Fixed empty columns crash by specifying width allocation (2 columns)
+left_col, right_col = st.columns(2)
 
 with left_col:
     st.subheader("💬 Active Interaction Buffer")
     
+    # Render static log history entries cleanly
     for message in st.session_state.chat_history:
         with st.chat_message(message["role"]):
             st.write(message["content"])
@@ -57,25 +64,27 @@ with left_col:
     
     if user_query:
         st.session_state.chat_history.append({"role": "user", "content": user_query})
+        st.session_state.last_query = user_query
         with st.chat_message("user"):
             st.write(user_query)
             
         # 1. Cloud Search Subspace Exploration via dense vectors
-        query_vector = embedder.encode(f"Represent this sentence for searching relevant passages: {user_query}").tolist()
-        
-        try:
-            search_results = qdrant_client.query_points(
-                collection_name="rini_growth_marketing",
-                query_vector=query_vector,
-                limit=2
-            ).points
+        with st.spinner("Traversing non-parametric vector space..."):
+            query_vector = embedder.encode(f"Represent this sentence for searching relevant passages: {user_query}").tolist()
             
-            context_fragments = [hit.payload.get("text_content", "") for hit in search_results if hit.payload]
-            st.session_state.retrieved_context = "\n\n".join(context_fragments) if context_fragments else "No relevant non-parametric vectors located."
-        except Exception as e:
-            st.session_state.retrieved_context = f"Database read exception: {str(e)}"
+            try:
+                search_results = qdrant_client.query_points(
+                    collection_name="rini_growth_marketing",
+                    query_vector=query_vector,
+                    limit=2
+                ).points
+                
+                context_fragments = [hit.payload.get("text_content", "") for hit in search_results if hit.payload]
+                st.session_state.retrieved_context = "\n\n".join(context_fragments) if context_fragments else "No relevant non-parametric vectors located."
+            except Exception as e:
+                st.session_state.retrieved_context = f"Database read exception: {str(e)}"
             
-        # 2. Cloud Inference Pipeline Generation
+        # 2. Cloud Inference Pipeline Generation with Streaming Capabilities
         system_instruction = (
             "You are Rini, an elite expert marketing cognitive agent. "
             "Synthesize a deep, precise, and highly technical answer based strictly on the provided factual context blocks.\n\n"
@@ -83,35 +92,40 @@ with left_col:
         ) + st.session_state.retrieved_context
         
         with st.chat_message("assistant"):
-            response_placeholder = st.empty()
             try:
-                completion = groq_client.chat.completions.create(
-                    model="openai/gpt-oss-120b",
+                # Optimized pipeline to fetch from standard high-throughput production models
+                completion_stream = groq_client.chat.completions.create(
+                    model="llama3-70b-8192",
                     messages=[
                         {"role": "system", "content": system_instruction},
                         {"role": "user", "content": user_query}
                     ],
-                    temperature=0.1
+                    temperature=0.1,
+                    stream=True
                 )
-                assistant_response = completion.choices.message.content
-                response_placeholder.write(assistant_response)
+                # Stream token production chunks smoothly for superior human-centric UI latency response
+                assistant_response = st.write_stream(completion_stream)
                 
                 st.session_state.chat_history.append({"role": "assistant", "content": assistant_response})
                 st.session_state.last_response = assistant_response
+                st.rerun() # Refresh layout context trees immediately
             except Exception as e:
                 st.error(f"Inference crash: {str(e)}")
 
     # 3. Interactive Alignment Feedback Loops
-    if st.session_state.last_response:
+    if st.session_state.last_response and st.session_state.last_query:
         st.markdown("##### Was this response accurate to production specs?")
-        f_left, f_right = st.columns()
+        # Fixed layout nesting alignment problem
+        f_left, f_right = st.columns(2)
         
-        if f_left.button("👍 Good"):
+        if f_left.button("👍 Good", use_container_width=True):
             st.toast("✅ Alignment feedback logged!", icon="🔥")
             
-        if f_right.button("👎 Hallucination / Poor"):
+        if f_right.button("👎 Hallucination / Poor", use_container_width=True):
             st.toast("⚠️ Negative alignment logged. Running reflection...", icon="🧠")
-            dialogue_snippet = f"USER: {st.session_state.chat_history[-2]['content']}\nASSISTANT: {st.session_state.last_response}"
+            
+            # Isolated message retrieval structures cleanly from dynamic shifting history indices
+            dialogue_snippet = f"USER: {st.session_state.last_query}\nASSISTANT: {st.session_state.last_response}"
             reflection_prompt = (
                 "Analyze the following conversation failure. Extract a corrected, explicit, clean factual assertion "
                 "statement summarizing the true platform mechanic to patch the knowledge base.\n"
@@ -119,19 +133,24 @@ with left_col:
                 f"TRANSCRIPT:\n{dialogue_snippet}"
             )
             try:
+                # Swapped to faster analytical instance configuration profiles for backend data transformation checks
                 raw_ref = groq_client.chat.completions.create(
-                    model="openai/gpt-oss-120b",
+                    model="llama3-8b-8192",
                     messages=[{"role": "user", "content": reflection_prompt}],
-                    temperature=0.1
+                    temperature=0.1,
+                    response_format={"type": "json_object"}
                 ).choices.message.content
-                s_idx = raw_ref.find('{')
-                e_idx = raw_ref.rfind('}') + 1
-                parsed_facts = json.loads(raw_ref[s_idx:e_idx]).get("assertions", [])
+                
+                parsed_facts = json.loads(raw_ref).get("assertions", [])
                 for fact in parsed_facts:
                     f_vector = embedder.encode(fact).tolist()
                     qdrant_client.upsert(
                         collection_name="rini_growth_marketing",
-                        points=[models.PointStruct(id=int(uuid.uuid4().int & 0xFFFFFFFF), vector=f_vector, payload={"source_doc": "user_critique_alignment.md", "text_content": fact})]
+                        points=[models.PointStruct(
+                            id=int(uuid.uuid4().int & 0xFFFFFFFF), 
+                            vector=f_vector, 
+                            payload={"source_doc": "user_critique_alignment.md", "text_content": fact}
+                        )]
                     )
                 st.success("🧠 Non-Parametric Memory Space Self-Evolved!")
             except Exception as ex:
@@ -139,4 +158,10 @@ with left_col:
 
 with right_col:
     st.subheader("📊 Cognitive Telemetry Monitor")
-    st.text_area("Retrieval Logs Context", value=st.session_state.retrieved_context, height=400, disabled=True, label_visibility="collapsed")
+    st.text_area(
+        "Retrieval Logs Context", 
+        value=st.session_state.retrieved_context, 
+        height=500, 
+        disabled=True, 
+        label_visibility="collapsed"
+    )
