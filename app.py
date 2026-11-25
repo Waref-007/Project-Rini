@@ -48,14 +48,16 @@ if "last_query" not in st.session_state:
     st.session_state.last_query = None
 if "retrieved_context" not in st.session_state:
     st.session_state.retrieved_context = ""
+if "telemetry_meta" not in st.session_state:
+    st.session_state.telemetry_meta = []
 
-# Fixed empty columns crash by specifying width allocation (2 columns)
+# Layout split allocation
 left_col, right_col = st.columns(2)
 
 with left_col:
     st.subheader("💬 Active Interaction Buffer")
     
-    # Render static log history entries cleanly
+    # Render historical conversation elements
     for message in st.session_state.chat_history:
         with st.chat_message(message["role"]):
             st.write(message["content"])
@@ -79,12 +81,24 @@ with left_col:
                     limit=2
                 ).points
                 
-                context_fragments = [hit.payload.get("text_content", "") for hit in search_results if hit.payload]
+                context_fragments = []
+                st.session_state.telemetry_meta = []
+                
+                for hit in search_results:
+                    if hit.payload:
+                        text = hit.payload.get("text_content", "")
+                        context_fragments.append(text)
+                        st.session_state.telemetry_meta.append({
+                            "id": hit.id,
+                            "source": hit.payload.get("source_doc", "unknown"),
+                            "snippet": text[:100] + "..."
+                        })
+                
                 st.session_state.retrieved_context = "\n\n".join(context_fragments) if context_fragments else "No relevant non-parametric vectors located."
             except Exception as e:
                 st.session_state.retrieved_context = f"Database read exception: {str(e)}"
             
-        # 2. Cloud Inference Pipeline Generation with Streaming Capabilities
+        # 2. Cloud Inference Pipeline Generation with Functional Streaming Replacement
         system_instruction = (
             "You are Rini, an elite expert marketing cognitive agent. "
             "Synthesize a deep, precise, and highly technical answer based strictly on the provided factual context blocks.\n\n"
@@ -93,9 +107,9 @@ with left_col:
         
         with st.chat_message("assistant"):
             try:
-                # Optimized pipeline to fetch from standard high-throughput production models
+                # Updated to highly performant, active production model replacements on Groq
                 completion_stream = groq_client.chat.completions.create(
-                    model="llama3-70b-8192",
+                    model="openai/gpt-oss-120b",
                     messages=[
                         {"role": "system", "content": system_instruction},
                         {"role": "user", "content": user_query}
@@ -103,19 +117,17 @@ with left_col:
                     temperature=0.1,
                     stream=True
                 )
-                # Stream token production chunks smoothly for superior human-centric UI latency response
                 assistant_response = st.write_stream(completion_stream)
                 
                 st.session_state.chat_history.append({"role": "assistant", "content": assistant_response})
                 st.session_state.last_response = assistant_response
-                st.rerun() # Refresh layout context trees immediately
+                st.invalidate_pages() # Clean cache flush replacement for global rerun safety
             except Exception as e:
                 st.error(f"Inference crash: {str(e)}")
 
     # 3. Interactive Alignment Feedback Loops
     if st.session_state.last_response and st.session_state.last_query:
         st.markdown("##### Was this response accurate to production specs?")
-        # Fixed layout nesting alignment problem
         f_left, f_right = st.columns(2)
         
         if f_left.button("👍 Good", use_container_width=True):
@@ -124,7 +136,6 @@ with left_col:
         if f_right.button("👎 Hallucination / Poor", use_container_width=True):
             st.toast("⚠️ Negative alignment logged. Running reflection...", icon="🧠")
             
-            # Isolated message retrieval structures cleanly from dynamic shifting history indices
             dialogue_snippet = f"USER: {st.session_state.last_query}\nASSISTANT: {st.session_state.last_response}"
             reflection_prompt = (
                 "Analyze the following conversation failure. Extract a corrected, explicit, clean factual assertion "
@@ -133,9 +144,9 @@ with left_col:
                 f"TRANSCRIPT:\n{dialogue_snippet}"
             )
             try:
-                # Swapped to faster analytical instance configuration profiles for backend data transformation checks
+                # Swapped to active, stable low-latency JSON extraction model
                 raw_ref = groq_client.chat.completions.create(
-                    model="llama3-8b-8192",
+                    model="openai/gpt-oss-20b",
                     messages=[{"role": "user", "content": reflection_prompt}],
                     temperature=0.1,
                     response_format={"type": "json_object"}
@@ -158,10 +169,19 @@ with left_col:
 
 with right_col:
     st.subheader("📊 Cognitive Telemetry Monitor")
+    
+    if st.session_state.telemetry_meta:
+        st.markdown("**Retrieved Vector Subspaces:**")
+        for idx, meta in enumerate(st.session_state.telemetry_meta):
+            with st.expander(f"📍 Fragment {idx+1} - Node ID: {meta['id']}"):
+                st.caption(f"Source: {meta['source']}")
+                st.text(meta['snippet'])
+                
+    st.markdown("**Full Raw Text Context Area:**")
     st.text_area(
         "Retrieval Logs Context", 
         value=st.session_state.retrieved_context, 
-        height=500, 
+        height=400, 
         disabled=True, 
         label_visibility="collapsed"
     )
